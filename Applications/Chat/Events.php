@@ -109,7 +109,7 @@ class Events
                 );
                 // 给当前用户发送用户列表 
                 // $new_message['client_list'] = $clients_list;
-                Gateway::sendToGroup($room_id ,json_encode($new_message));
+                // Gateway::sendToGroup($room_id ,json_encode($new_message));
                 Gateway::sendToCurrentClient(json_encode($new_message));
                 return;
 
