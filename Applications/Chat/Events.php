@@ -87,7 +87,7 @@ class Events
                 $client_name = $_SESSION['client_name'];
                 $client_number = $message_data['number'];
                 $new_message = array(
-                    'type'=>'say', 
+                    'type'=>'gamersay', 
                     'from_client_id'=>$client_id,
                     'from_client_name' =>$client_name,
                     'to_client_id'=>'all',
