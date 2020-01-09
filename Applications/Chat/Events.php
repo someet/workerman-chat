@@ -58,7 +58,7 @@ class Events
                 $client_name = htmlspecialchars($message_data['client_name']);
                 $_SESSION['room_id'] = $room_id;
                 $_SESSION['client_name'] = $client_name;
-                $_SESSIOn['user_id'] = $message_data['user_id'];
+                $_SESSION['user_id'] = $message_data['user_id'];
                 // 获取房间内所有用户列表 
                 // $clients_list = Gateway::getClientSessionsByGroup($room_id);
                 // foreach($clients_list as $tmp_client_id=>$item)
@@ -90,14 +90,8 @@ class Events
                 $room_id = $_SESSION['room_id'];
                 $client_name = $_SESSION['client_name'];
                 $client_number = $message_data['number'];
-                $user_id = $_SESSIOn['user_id'];
+                $user_id = $_SESSION['user_id'];
                 $clients_list = Gateway::getClientSessionsByGroup($room_id);
-                foreach($clients_list as $tmp_client_id=>$item)
-                {
-                    $clients_list[$tmp_client_id]['name'] = $item['client_name'];
-                    $clients_list[$tmp_client_id]['head'] = $item['head'];
-                    $clients_list[$tmp_client_id]['user_id'] = $item['user_id'];
-                }
                 $new_message = array(
                     'type'=>'gamersay', 
                     'from_client_id'=>$client_id,
@@ -105,6 +99,7 @@ class Events
                     'to_client_id'=>'all',
                     'content'=>$client_number,
                     'user_id'=>$user_id,
+                    'list'=>$clients_list,
                     'time'=>date('Y-m-d H:i:s'),
                 );
                 // 给当前用户发送用户列表 
