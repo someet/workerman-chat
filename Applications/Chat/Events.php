@@ -91,6 +91,13 @@ class Events
                 $client_name = $_SESSION['client_name'];
                 $client_number = $message_data['number'];
                 $user_id = $_SESSIOn['user_id'];
+                $clients_list = Gateway::getClientSessionsByGroup($room_id);
+                foreach($clients_list as $tmp_client_id=>$item)
+                {
+                    $clients_list[$tmp_client_id]['name'] = $item['client_name'];
+                    $clients_list[$tmp_client_id]['head'] = $item['head'];
+                    $clients_list[$tmp_client_id]['id'] = $item['id'];
+                }
                 $new_message = array(
                     'type'=>'gamersay', 
                     'from_client_id'=>$client_id,
@@ -100,15 +107,8 @@ class Events
                     'user_id'=>$user_id,
                     'time'=>date('Y-m-d H:i:s'),
                 );
-                $clients_list = Gateway::getClientSessionsByGroup($room_id);
-                foreach($clients_list as $tmp_client_id=>$item)
-                {
-                    $clients_list[$tmp_client_id]['name'] = $item['client_name'];
-                    $clients_list[$tmp_client_id]['head'] = $item['head'];
-                    $clients_list[$tmp_client_id]['id'] = $item['id'];
-                }
                 // 给当前用户发送用户列表 
-                $new_message['client_list'] = $clients_list;
+                // $new_message['client_list'] = $clients_list;
                 Gateway::sendToGroup($room_id ,json_encode($new_message));
                 Gateway::sendToCurrentClient(json_encode($new_message));
                 return;
