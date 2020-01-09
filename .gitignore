@@ -5,3 +5,4 @@ logs
 applications/Wordpress/wp-config.php
 Applications/Chat/Config
 .gitignore
+vendor
