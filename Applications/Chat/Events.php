@@ -91,10 +91,11 @@ class Events
                     'from_client_id'=>$client_id,
                     'from_client_name' =>$client_name,
                     'to_client_id'=>'all',
-                    'content'=>'4',
+                    'content'=>$client_number,
                     'time'=>date('Y-m-d H:i:s'),
                 );
-                return Gateway::sendToGroup($room_id ,json_encode($new_message));
+                Gateway::sendToCurrentClient(json_encode($new_message));
+                return;
 
             case 'login':
                 $client_name = htmlspecialchars($message_data['client_name']);
