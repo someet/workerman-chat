@@ -38,7 +38,7 @@ class Gateway extends Worker
      *
      * @var string
      */
-    const VERSION = '3.0.7';
+    const VERSION = '3.0.13';
 
     /**
      * 本机 IP
@@ -65,7 +65,7 @@ class Gateway extends Worker
     /**
      * 注册服务地址,用于注册 Gateway BusinessWorker，使之能够通讯
      *
-     * @var string
+     * @var string|array
      */
     public $registerAddress = '127.0.0.1:1236';
 
@@ -214,13 +214,6 @@ class Gateway extends Worker
      * @var int
      */
     protected $_gatewayPort = 0;
-
-    /**
-     * 到注册中心的连接
-     *
-     * @var AsyncTcpConnection
-     */
-    protected $_registerConnection = null;
     
     /**
      * connectionId 记录器
@@ -247,8 +240,8 @@ class Gateway extends Worker
 		$this->_gatewayPort = substr(strrchr($socket_name,':'),1);
         $this->router = array("\\GatewayWorker\\Gateway", 'routerBind');
 
-        $backrace                = debug_backtrace();
-        $this->_autoloadRootPath = dirname($backrace[0]['file']);
+        $backtrace               = debug_backtrace();
+        $this->_autoloadRootPath = dirname($backtrace[0]['file']);
     }
 
     /**
@@ -272,6 +265,10 @@ class Gateway extends Worker
         // 保存用户的回调，当对应的事件发生时触发
         $this->_onWorkerStop = $this->onWorkerStop;
         $this->onWorkerStop  = array($this, 'onWorkerStop');
+
+        if (!is_array($this->registerAddress)) {
+            $this->registerAddress = array($this->registerAddress);
+        }
 
         // 记录进程启动的时间
         $this->_startTime = time();
@@ -322,9 +319,22 @@ class Gateway extends Worker
         // 如果用户有自定义 onConnect 回调，则执行
         if ($this->_onConnect) {
             call_user_func($this->_onConnect, $connection);
+        } elseif ($connection->protocol === '\Workerman\Protocols\Websocket') {
+            $connection->onWebSocketConnect = array($this, 'onWebsocketConnect');
         }
 
-        $this->sendToWorker(GatewayProtocol::CMD_ON_CONNECTION, $connection);
+        $this->sendToWorker(GatewayProtocol::CMD_ON_CONNECT, $connection);
+    }
+
+    /**
+     * websocket握手时触发
+     *
+     * @param $connection
+     * @param $http_buffer
+     */
+    public function onWebsocketConnect($connection, $http_buffer)
+    {
+        $this->sendToWorker(GatewayProtocol::CMD_ON_WEBSOCKET_CONNECT, $connection, array('get' => $_GET, 'server' => $_SERVER, 'cookie' => $_COOKIE));
     }
     
     /**
@@ -364,8 +374,8 @@ class Gateway extends Worker
             /** @var TcpConnection $worker_connection */
             $worker_connection = call_user_func($this->router, $this->_workerConnections, $connection, $cmd, $body);
             if (false === $worker_connection->send($gateway_data)) {
-                $msg = "SendBufferToWorker fail. May be the send buffer are overflow. See http://wiki.workerman.net/Error2 for detail";
-                $this->log($msg);
+                $msg = "SendBufferToWorker fail. May be the send buffer are overflow. See http://doc2.workerman.net/send-buffer-overflow.html";
+                static::log($msg);
                 return false;
             }
         } // 没有可用的 worker
@@ -374,8 +384,8 @@ class Gateway extends Worker
             // 所以不记录日志，只是关闭连接
             $time_diff = 2;
             if (time() - $this->_startTime >= $time_diff) {
-                $msg = 'SendBufferToWorker fail. The connections between Gateway and BusinessWorker are not ready. See http://wiki.workerman.net/Error3 for detail';
-                $this->log($msg);
+                $msg = 'SendBufferToWorker fail. The connections between Gateway and BusinessWorker are not ready. See http://doc2.workerman.net/send-buffer-to-worker-fail.html';
+                static::log($msg);
             }
             $connection->destroy();
             return false;
@@ -468,11 +478,6 @@ class Gateway extends Worker
             Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, array($this, 'pingBusinessWorker'));
         }
 
-        // 如果 Register 服务器不在本地服务器，则需要保持心跳
-        if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
-            Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, array($this, 'pingRegister'));
-        }
-
         if (!class_exists('\Protocols\GatewayProtocol')) {
             class_alias('GatewayWorker\Protocols\GatewayProtocol', 'Protocols\GatewayProtocol');
         }
@@ -480,6 +485,7 @@ class Gateway extends Worker
         // 初始化 gateway 内部的监听，用于监听 worker 的连接已经连接上发来的数据
         $this->_innerTcpWorker = new Worker("GatewayProtocol://{$this->lanIp}:{$this->lanPort}");
         $this->_innerTcpWorker->listen();
+	$this->_innerTcpWorker->name = 'GatewayInnerWorker';
 
         // 重新设置自动加载根目录
         Autoloader::setRootPath($this->_autoloadRootPath);
@@ -516,13 +522,16 @@ class Gateway extends Worker
      * @param TcpConnection $connection
      * @param mixed         $data
      * @throws \Exception
+     *
+     * @return void
      */
     public function onWorkerMessage($connection, $data)
     {
         $cmd = $data['cmd'];
         if (empty($connection->authorized) && $cmd !== GatewayProtocol::CMD_WORKER_CONNECT && $cmd !== GatewayProtocol::CMD_GATEWAY_CLIENT_CONNECT) {
             self::log("Unauthorized request from " . $connection->getRemoteIp() . ":" . $connection->getRemotePort());
-            return $connection->close();
+            $connection->close();
+            return;
         }
         switch ($cmd) {
             // BusinessWorker连接Gateway
@@ -530,16 +539,17 @@ class Gateway extends Worker
                 $worker_info = json_decode($data['body'], true);
                 if ($worker_info['secret_key'] !== $this->secretKey) {
                     self::log("Gateway: Worker key does not match ".var_export($this->secretKey, true)." !== ". var_export($this->secretKey));
-                    return $connection->close();
+                    $connection->close();
+                    return;
                 }
                 $key = $connection->getRemoteIp() . ':' . $worker_info['worker_key'];
                 // 在一台服务器上businessWorker->name不能相同
                 if (isset($this->_workerConnections[$key])) {
                     self::log("Gateway: Worker->name conflict. Key:{$key}");
-		    $connection->close();
+		            $connection->close();
                     return;
                 }
-		$connection->key = $key;
+		        $connection->key = $key;
                 $this->_workerConnections[$key] = $connection;
                 $connection->authorized = true;
                 return;
@@ -548,7 +558,8 @@ class Gateway extends Worker
                 $worker_info = json_decode($data['body'], true);
                 if ($worker_info['secret_key'] !== $this->secretKey) {
                     self::log("Gateway: GatewayClient key does not match ".var_export($this->secretKey, true)." !== ".var_export($this->secretKey, true));
-                    return $connection->close();
+                    $connection->close();
+                    return;
                 }
                 $connection->authorized = true;
                 return;
@@ -596,6 +607,68 @@ class Gateway extends Worker
                     }
                 }
                 return;
+            case GatewayProtocol::CMD_SELECT:
+                $client_info_array = array();
+                $ext_data = json_decode($data['ext_data'], true);
+                if (!$ext_data) {
+                    echo 'CMD_SELECT ext_data=' . var_export($data['ext_data'], true) . '\r\n';
+                    $buffer = serialize($client_info_array);
+                    $connection->send(pack('N', strlen($buffer)) . $buffer, true);
+                    return;
+                }
+                $fields = $ext_data['fields'];
+                $where  = $ext_data['where'];
+                if ($where) {
+                    $connection_box_map = array(
+                        'groups'        => $this->_groupConnections,
+                        'uid'           => $this->_uidConnections
+                    );
+                    // $where = ['groups'=>[x,x..], 'uid'=>[x,x..], 'connection_id'=>[x,x..]]
+                    foreach ($where as $key => $items) {
+                        if ($key !== 'connection_id') {
+                            $connections_box = $connection_box_map[$key];
+                            foreach ($items as $item) {
+                                if (isset($connections_box[$item])) {
+                                    foreach ($connections_box[$item] as $connection_id => $client_connection) {
+                                        if (!isset($client_info_array[$connection_id])) {
+                                            $client_info_array[$connection_id] = array();
+                                            // $fields = ['groups', 'uid', 'session']
+                                            foreach ($fields as $field) {
+                                                $client_info_array[$connection_id][$field] = isset($client_connection->$field) ? $client_connection->$field : null;
+                                            }
+                                        }
+                                    }
+
+                                }
+                            }
+                        } else {
+                            foreach ($items as $connection_id) {
+                                if (isset($this->_clientConnections[$connection_id])) {
+                                    $client_connection = $this->_clientConnections[$connection_id];
+                                    $client_info_array[$connection_id] = array();
+                                    // $fields = ['groups', 'uid', 'session']
+                                    foreach ($fields as $field) {
+                                        $client_info_array[$connection_id][$field] = isset($client_connection->$field) ? $client_connection->$field : null;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    foreach ($this->_clientConnections as $connection_id => $client_connection) {
+                        foreach ($fields as $field) {
+                            $client_info_array[$connection_id][$field] = isset($client_connection->$field) ? $client_connection->$field : null;
+                        }
+                    }
+                }
+                $buffer = serialize($client_info_array);
+                $connection->send(pack('N', strlen($buffer)) . $buffer, true);
+                return;
+            // 获取在线群组列表
+            case GatewayProtocol::CMD_GET_GROUP_ID_LIST:
+                $buffer = serialize(array_keys($this->_groupConnections));
+                $connection->send(pack('N', strlen($buffer)) . $buffer, true);
+                return;
             // 重新赋值 session
             case GatewayProtocol::CMD_SET_SESSION:
                 if (isset($this->_clientConnections[$data['connection_id']])) {
@@ -613,7 +686,7 @@ class Gateway extends Worker
                     }
                     $session = Context::sessionDecode($this->_clientConnections[$data['connection_id']]->session);
                     $session_for_merge = Context::sessionDecode($data['ext_data']);
-                    $session = $session_for_merge + $session;
+                    $session = array_replace_recursive($session, $session_for_merge);
                     $this->_clientConnections[$data['connection_id']]->session = Context::sessionEncode($session);
                 }
                 return;
@@ -629,8 +702,8 @@ class Gateway extends Worker
                 }
                 $connection->send(pack('N', strlen($session)) . $session, true);
                 return;
-            // 获得客户端在线状态 Gateway::getALLClientInfo()
-            case GatewayProtocol::CMD_GET_ALL_CLIENT_INFO:
+            // 获得客户端sessions
+            case GatewayProtocol::CMD_GET_ALL_CLIENT_SESSIONS:
                 $client_info_array = array();
                 foreach ($this->_clientConnections as $connection_id => $client_connection) {
                     $client_info_array[$connection_id] = $client_connection->session;
@@ -728,6 +801,24 @@ class Gateway extends Worker
                     return;
                 }
                 unset($client_connection->groups[$group], $this->_groupConnections[$group][$connection_id]);
+                if (empty($this->_groupConnections[$group])) {
+                    unset($this->_groupConnections[$group]);
+                }
+                return;
+            // 解散分组
+            case GatewayProtocol::CMD_UNGROUP:
+                $group = $data['ext_data'];
+                if (empty($group)) {
+                    echo "leave(group) group empty, group=" . var_export($group, true);
+                    return;
+                }
+                if (empty($this->_groupConnections[$group])) {
+                    return;
+                }
+                foreach ($this->_groupConnections[$group] as $client_connection) {
+                    unset($client_connection->groups[$group]);
+                }
+                unset($this->_groupConnections[$group]);
                 return;
             // 向某个用户组发送消息 Gateway::sendToGroup($group, $msg);
             case GatewayProtocol::CMD_SEND_TO_GROUP:
@@ -753,8 +844,8 @@ class Gateway extends Worker
                     }
                 }
                 return;
-            // 获取某用户组成员信息 Gateway::getClientInfoByGroup($group);
-            case GatewayProtocol::CMD_GET_CLINET_INFO_BY_GROUP:
+            // 获取某用户组成员信息 Gateway::getClientSessionsByGroup($group);
+            case GatewayProtocol::CMD_GET_CLIENT_SESSIONS_BY_GROUP:
                 $group = $data['ext_data'];
                 if (!isset($this->_groupConnections[$group])) {
                     $buffer = serialize(array());
@@ -794,9 +885,10 @@ class Gateway extends Worker
                 return;
             default :
                 $err_msg = "gateway inner pack err cmd=$cmd";
-                throw new \Exception($err_msg);
+                echo $err_msg;
         }
     }
+
 
     /**
      * 当worker连接关闭时
@@ -805,7 +897,6 @@ class Gateway extends Worker
      */
     public function onWorkerClose($connection)
     {
-        // $this->log("{$connection->key} CLOSE INNER_CONNECTION\n");
         if (isset($connection->key)) {
             unset($this->_workerConnections[$connection->key]);
         }
@@ -818,17 +909,29 @@ class Gateway extends Worker
      */
     public function registerAddress()
     {
-        $address                   = $this->lanIp . ':' . $this->lanPort;
-        $this->_registerConnection = new AsyncTcpConnection("text://{$this->registerAddress}");
-        $this->_registerConnection->send('{"event":"gateway_connect", "address":"' . $address . '", "secret_key":"' . $this->secretKey . '"}');
-        $this->_registerConnection->onClose = array($this, 'onRegisterConnectionClose');
-        $this->_registerConnection->connect();
+        $address = $this->lanIp . ':' . $this->lanPort;
+        foreach ($this->registerAddress as $register_address) {
+            $register_connection = new AsyncTcpConnection("text://{$register_address}");
+            $secret_key = $this->secretKey;
+            $register_connection->onConnect = function($register_connection) use ($address, $secret_key, $register_address){
+                $register_connection->send('{"event":"gateway_connect", "address":"' . $address . '", "secret_key":"' . $secret_key . '"}');
+                // 如果Register服务器不在本地服务器，则需要保持心跳
+                if (strpos($register_address, '127.0.0.1') !== 0) {
+                    $register_connection->ping_timer = Timer::add(self::PERSISTENCE_CONNECTION_PING_INTERVAL, function () use ($register_connection) {
+                        $register_connection->send('{"event":"ping"}');
+                    });
+                }
+            };
+            $register_connection->onClose = function ($register_connection) {
+                if(!empty($register_connection->ping_timer)) {
+                    Timer::del($register_connection->ping_timer);
+                }
+                $register_connection->reconnect(1);
+            };
+            $register_connection->connect();
+        }
     }
 
-    public function onRegisterConnectionClose()
-    {
-        Timer::add(1, array($this, 'registerAddress'), null, false);
-    }
 
     /**
      * 心跳逻辑
@@ -880,16 +983,6 @@ class Gateway extends Worker
     }
 
     /**
-     * 向 Register 发送心跳，用来保持长连接
-     */
-    public function pingRegister()
-    {
-        if ($this->_registerConnection) {
-            $this->_registerConnection->send('{"event":"ping"}');
-        }
-    }
-
-    /**
      * @param mixed $data
      *
      * @return string
@@ -912,5 +1005,15 @@ class Gateway extends Worker
         if ($this->_onWorkerStop) {
             call_user_func($this->_onWorkerStop, $this);
         }
+    }
+
+    /**
+     * Log.
+     * @param string $msg
+     */
+    public static function log($msg){
+        Timer::add(1, function() use ($msg) {
+            Worker::log($msg);
+        }, null, false);
     }
 }

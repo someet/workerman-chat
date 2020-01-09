@@ -1,28 +1,74 @@
 [
     {
-        "name": "workerman/workerman",
-        "version": "v3.4.7",
-        "version_normalized": "3.4.7.0",
+        "name": "workerman/gateway-worker",
+        "version": "v3.0.13",
+        "version_normalized": "3.0.13.0",
         "source": {
             "type": "git",
-            "url": "https://github.com/walkor/Workerman.git",
-            "reference": "2818bf310cb903a940f6b5a38f5e520c776db056"
+            "url": "https://github.com/walkor/GatewayWorker.git",
+            "reference": "38b44c95f21cd340b5a9cff3987ddb2abb9a2a38"
         },
         "dist": {
             "type": "zip",
-            "url": "https://files.phpcomposer.com/files/walkor/Workerman/2818bf310cb903a940f6b5a38f5e520c776db056.zip",
-            "reference": "2818bf310cb903a940f6b5a38f5e520c776db056",
-            "shasum": ""
+            "url": "https://api.github.com/repos/walkor/GatewayWorker/zipball/38b44c95f21cd340b5a9cff3987ddb2abb9a2a38",
+            "reference": "38b44c95f21cd340b5a9cff3987ddb2abb9a2a38",
+            "shasum": "",
+            "mirrors": [
+                {
+                    "url": "https://mirrors.aliyun.com/composer/dists/%package%/%reference%.%type%",
+                    "preferred": true
+                }
+            ]
         },
         "require": {
-            "ext-pcntl": "*",
-            "ext-posix": "*",
+            "workerman/workerman": ">=3.1.8"
+        },
+        "time": "2019-07-02T11:55:24+00:00",
+        "type": "library",
+        "installation-source": "dist",
+        "autoload": {
+            "psr-4": {
+                "GatewayWorker\\": "./src"
+            }
+        },
+        "notification-url": "https://packagist.org/downloads/",
+        "license": [
+            "MIT"
+        ],
+        "homepage": "http://www.workerman.net",
+        "keywords": [
+            "communication",
+            "distributed"
+        ]
+    },
+    {
+        "name": "workerman/workerman",
+        "version": "v3.5.24",
+        "version_normalized": "3.5.24.0",
+        "source": {
+            "type": "git",
+            "url": "https://github.com/walkor/Workerman.git",
+            "reference": "058cd3eada3d4b302e903a09a7d3ce94e6a1fca2"
+        },
+        "dist": {
+            "type": "zip",
+            "url": "https://api.github.com/repos/walkor/Workerman/zipball/058cd3eada3d4b302e903a09a7d3ce94e6a1fca2",
+            "reference": "058cd3eada3d4b302e903a09a7d3ce94e6a1fca2",
+            "shasum": "",
+            "mirrors": [
+                {
+                    "url": "https://mirrors.aliyun.com/composer/dists/%package%/%reference%.%type%",
+                    "preferred": true
+                }
+            ]
+        },
+        "require": {
             "php": ">=5.3"
         },
         "suggest": {
             "ext-event": "For better performance. "
         },
-        "time": "2017-08-08T08:51:56+00:00",
+        "time": "2020-01-07T14:36:47+00:00",
         "type": "library",
         "installation-source": "dist",
         "autoload": {
@@ -47,42 +93,6 @@
         "keywords": [
             "asynchronous",
             "event-loop"
-        ]
-    },
-    {
-        "name": "workerman/gateway-worker",
-        "version": "v3.0.7",
-        "version_normalized": "3.0.7.0",
-        "source": {
-            "type": "git",
-            "url": "https://github.com/walkor/GatewayWorker.git",
-            "reference": "4444c59da4b5cd68679172904a40b66e1338389c"
-        },
-        "dist": {
-            "type": "zip",
-            "url": "https://files.phpcomposer.com/files/walkor/GatewayWorker/4444c59da4b5cd68679172904a40b66e1338389c.zip",
-            "reference": "4444c59da4b5cd68679172904a40b66e1338389c",
-            "shasum": ""
-        },
-        "require": {
-            "workerman/workerman": ">=3.1.8"
-        },
-        "time": "2017-06-26T14:49:54+00:00",
-        "type": "library",
-        "installation-source": "dist",
-        "autoload": {
-            "psr-4": {
-                "GatewayWorker\\": "./src"
-            }
-        },
-        "notification-url": "https://packagist.org/downloads/",
-        "license": [
-            "MIT"
-        ],
-        "homepage": "http://www.workerman.net",
-        "keywords": [
-            "communication",
-            "distributed"
         ]
     }
 ]

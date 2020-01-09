@@ -65,10 +65,10 @@ class UdpConnection extends ConnectionInterface
             $parser      = $this->protocol;
             $send_buffer = $parser::encode($send_buffer, $this);
             if ($send_buffer === '') {
-                return null;
+                return;
             }
         }
-        return strlen($send_buffer) === stream_socket_sendto($this->_socket, $send_buffer, 0, $this->_remoteAddress);
+        return \strlen($send_buffer) === \stream_socket_sendto($this->_socket, $send_buffer, 0, $this->_remoteAddress);
     }
 
     /**
@@ -78,9 +78,9 @@ class UdpConnection extends ConnectionInterface
      */
     public function getRemoteIp()
     {
-        $pos = strrpos($this->_remoteAddress, ':');
+        $pos = \strrpos($this->_remoteAddress, ':');
         if ($pos) {
-            return trim(substr($this->_remoteAddress, 0, $pos), '[]');
+            return \trim(\substr($this->_remoteAddress, 0, $pos), '[]');
         }
         return '';
     }
@@ -93,9 +93,85 @@ class UdpConnection extends ConnectionInterface
     public function getRemotePort()
     {
         if ($this->_remoteAddress) {
-            return (int)substr(strrchr($this->_remoteAddress, ':'), 1);
+            return (int)\substr(\strrchr($this->_remoteAddress, ':'), 1);
         }
         return 0;
+    }
+
+    /**
+     * Get remote address.
+     *
+     * @return string
+     */
+    public function getRemoteAddress()
+    {
+        return $this->_remoteAddress;
+    }
+
+    /**
+     * Get local IP.
+     *
+     * @return string
+     */
+    public function getLocalIp()
+    {
+        $address = $this->getLocalAddress();
+        $pos = \strrpos($address, ':');
+        if (!$pos) {
+            return '';
+        }
+        return \substr($address, 0, $pos);
+    }
+
+    /**
+     * Get local port.
+     *
+     * @return int
+     */
+    public function getLocalPort()
+    {
+        $address = $this->getLocalAddress();
+        $pos = \strrpos($address, ':');
+        if (!$pos) {
+            return 0;
+        }
+        return (int)\substr(\strrchr($address, ':'), 1);
+    }
+
+    /**
+     * Get local address.
+     *
+     * @return string
+     */
+    public function getLocalAddress()
+    {
+        return (string)@\stream_socket_get_name($this->_socket, false);
+    }
+
+    /**
+     * Is ipv4.
+     *
+     * @return bool.
+     */
+    public function isIpV4()
+    {
+        if ($this->transport === 'unix') {
+            return false;
+        }
+        return \strpos($this->getRemoteIp(), ':') === false;
+    }
+
+    /**
+     * Is ipv6.
+     *
+     * @return bool.
+     */
+    public function isIpV6()
+    {
+        if ($this->transport === 'unix') {
+            return false;
+        }
+        return \strpos($this->getRemoteIp(), ':') !== false;
     }
 
     /**
