@@ -59,6 +59,7 @@ class Events
                 $_SESSION['room_id'] = $room_id;
                 $_SESSION['client_name'] = $client_name;
                 $_SESSION['user_id'] = $message_data['user_id'];
+                $_SESSION['head'] = $message_data['head'];
                 // 获取房间内所有用户列表 
                 $clients_list = Gateway::getClientSessionsByGroup($room_id);
                 // foreach($clients_list as $tmp_client_id=>$item)
