@@ -85,7 +85,7 @@ class Events
                 }
                 $room_id = $_SESSION['room_id'];
                 $client_name = $_SESSION['client_name'];
-                
+                $client_number = $message_data['number'];
                 $new_message = array(
                     'type'=>'say', 
                     'from_client_id'=>$client_id,
