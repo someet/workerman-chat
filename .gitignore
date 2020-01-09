@@ -3,5 +3,5 @@ logs
 .project
 .settings
 applications/Wordpress/wp-config.php
-.gitignore
 Applications/Chat/Config
+.gitignore
