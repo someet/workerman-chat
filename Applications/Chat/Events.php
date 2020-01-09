@@ -60,14 +60,16 @@ class Events
                 $_SESSION['client_name'] = $client_name;
                 $_SESSIOn['user_id'] = $message_data['user_id'];
                 // 获取房间内所有用户列表 
-                $clients_list = Gateway::getClientSessionsByGroup($room_id);
-                foreach($clients_list as $tmp_client_id=>$item)
-                {
-                    $clients_list[$tmp_client_id]['name'] = $item['client_name'];
-                    $clients_list[$tmp_client_id]['head'] = $item['head'];
-                    $clients_list[$tmp_client_id]['id'] = $item['id'];
-                }
-                // $clients_list[$client_id] = $client_name;
+                // $clients_list = Gateway::getClientSessionsByGroup($room_id);
+                // foreach($clients_list as $tmp_client_id=>$item)
+                // {
+                //     $clients_list[$tmp_client_id]['name'] = $item['client_name'];
+                //     $clients_list[$tmp_client_id]['head'] = $item['head'];
+                //     $clients_list[$tmp_client_id]['id'] = $item['id'];
+                // }
+                $clients_list['name'] = $item['client_name'];
+                $clients_list['head'] = $item['head'];
+                $clients_list['id'] = $item['id'];
                 
                 // 转播给当前房间的所有客户端，xx进入聊天室 message {type:login, client_id:xx, name:xx} 
                 $new_message = array('type'=>$message_data['type'], 'client_id'=>$client_id, 'client_name'=>htmlspecialchars($client_name), 'time'=>date('Y-m-d H:i:s'));
