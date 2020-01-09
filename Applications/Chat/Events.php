@@ -96,7 +96,7 @@ class Events
                 {
                     $clients_list[$tmp_client_id]['name'] = $item['client_name'];
                     $clients_list[$tmp_client_id]['head'] = $item['head'];
-                    $clients_list[$tmp_client_id]['id'] = $item['id'];
+                    $clients_list[$tmp_client_id]['user_id'] = $item['user_id'];
                 }
                 $new_message = array(
                     'type'=>'gamersay', 
@@ -109,8 +109,8 @@ class Events
                 );
                 // 给当前用户发送用户列表 
                 // $new_message['client_list'] = $clients_list;
-                // Gateway::sendToGroup($room_id ,json_encode($new_message));
-                Gateway::sendToCurrentClient(json_encode($new_message));
+                Gateway::sendToGroup($room_id ,json_encode($new_message));
+                // Gateway::sendToCurrentClient(json_encode($new_message));
                 return;
 
             case 'login':
