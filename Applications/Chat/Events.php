@@ -67,9 +67,9 @@ class Events
                 //     $clients_list[$tmp_client_id]['head'] = $item['head'];
                 //     $clients_list[$tmp_client_id]['id'] = $item['id'];
                 // }
-                $clients_list['name'] = $item['client_name'];
-                $clients_list['head'] = $item['head'];
-                $clients_list['id'] = $item['id'];
+                $clients_list['name'] = $message_data['client_name'];
+                $clients_list['head'] = $message_data['head'];
+                $clients_list['id'] = $message_data['id'];
                 
                 // 转播给当前房间的所有客户端，xx进入聊天室 message {type:login, client_id:xx, name:xx} 
                 $new_message = array('type'=>$message_data['type'], 'client_id'=>$client_id, 'client_name'=>htmlspecialchars($client_name), 'time'=>date('Y-m-d H:i:s'));
